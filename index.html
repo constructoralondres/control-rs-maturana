@@ -1613,15 +1613,22 @@ window.verHistorial = async () => {
     return d.toISOString().slice(0,10);
   }
   // Recopilar semanas con datos + siempre incluir la semana actual
+  const todayISO = getTodayISO();
   const weekSet = new Set(dates.map(d => getMondayOf(d)));
   weekSet.add(getMondayOf(todayISO)); // semana actual siempre visible
-  const weeks = Array.from(weekSet).sort().reverse();
+  const weeks = Array.from(weekSet).sort(); // ascendente: semana más reciente abajo
+  const currentWeekMonday = getMondayOf(todayISO);
+  const FERIADOS_CL = new Set([
+    '2026-01-01','2026-01-02','2026-04-03','2026-04-04',
+    '2026-05-01','2026-05-21','2026-06-21','2026-06-29',
+    '2026-07-16','2026-08-15','2026-09-18','2026-09-19',
+    '2026-10-12','2026-10-31','2026-11-01','2026-12-08','2026-12-25'
+  ]);
   const DAY_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes'];
   function fmtDate(iso) {
     const [y,m,d] = iso.split('-');
     return `${d}-${m}-${y}`;
   }
-  const todayISO = new Date().toISOString().slice(0,10);
   const ROWS = [
     { key:'R0',  label:'R0 int.',  bg:'#E6F1FB', color:'#0C447C', cellColor:'#0C447C' },
     { key:'R1',  label:'R1 int.',  bg:'#EAF3DE', color:'#27500A', cellColor:'#27500A' },
@@ -1631,15 +1638,17 @@ window.verHistorial = async () => {
   let html = '';
   weeks.forEach(mondayISO => {
     const weekDates = Array.from({length:5}, (_,i) => addDays(mondayISO, i));
-    if (!weekDates.some(d => byDate[d])) return;
+    if (!weekDates.some(d => byDate[d]) && mondayISO !== currentWeekMonday) return;
     html += `<table style="width:100%;border-collapse:collapse;margin-bottom:18px;font-size:11px">
       <thead><tr style="background:#f5f3ef">
         <th style="padding:5px 7px;text-align:left;color:#888;font-weight:600;border:1px solid #eee;width:68px"> </th>`;
     weekDates.forEach((iso, i) => {
       const isToday = iso === todayISO;
-      html += `<th style="padding:4px 3px;text-align:center;color:${isToday?'#0C447C':'#666'};font-weight:600;border:1px solid #eee;min-width:56px;background:${isToday?'#E6F1FB':'#f5f3ef'}">
+      const isHol = FERIADOS_CL.has(iso);
+      html += `<th style="padding:4px 3px;text-align:center;color:${isToday?'#0C447C':'#666'};font-weight:600;border:1px solid #eee;min-width:56px;background:${isToday?'#E6F1FB':isHol?'#fff8e1':'#f5f3ef'}">
         <div style="font-size:10px">${DAY_NAMES[i]}</div>
         <div style="font-weight:400;font-size:9px;color:#aaa;white-space:nowrap">${fmtDate(iso)}</div>
+        ${isHol ? '<div style="font-size:8px;font-weight:700;color:#b8860b">FERIADO</div>' : ''}
       </th>`;
     });
     html += '</tr></thead><tbody>';
@@ -1649,7 +1658,10 @@ window.verHistorial = async () => {
       weekDates.forEach(iso => {
         const c = byDate[iso];
         const isFuture = iso > todayISO;
-        if (isFuture || !c) {
+        const isFeriado = FERIADOS_CL.has(iso);
+        if (!c && isFeriado) {
+          html += `<td style="padding:6px 4px;text-align:center;border:1px solid #eee;background:#fff8e1"><b style="font-size:9px;color:#b8860b">FERIADO</b></td>`;
+        } else if (isFuture || !c) {
           html += `<td style="padding:6px 4px;text-align:center;border:1px solid #eee;color:#ddd;background:${ri%2===1?'#fafafa':'#fff'}">—</td>`;
         } else {
           const val = c.delta?.[row.key] ?? 0;
